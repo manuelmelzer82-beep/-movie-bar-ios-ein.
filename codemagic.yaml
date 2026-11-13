@@ -1,0 +1,51 @@
+workflows:
+  ios-build-check:
+    name: Movie Bar – Xcode-Build prüfen
+    instance_type: mac_mini_m2
+    max_build_duration: 25
+    environment:
+      xcode: latest
+    scripts:
+      - name: Xcode-Projekt entpacken
+        script: unzip -q MovieBar-iOS.zip
+      - name: Für den iPhone-Simulator kompilieren
+        script: |
+          xcodebuild \
+            -project MovieBar-iOS/MovieBar.xcodeproj \
+            -scheme MovieBar \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$CM_BUILD_DIR/build/check" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+  ios-testflight:
+    name: Movie Bar – TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 35
+    integrations:
+      app_store_connect: MovieBar
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: de.moviebarmeckenbeuren.app
+    scripts:
+      - name: Xcode-Projekt entpacken
+        script: unzip -q MovieBar-iOS.zip
+      - name: Signierung einrichten
+        script: |
+          xcode-project use-profiles \
+            --project "$CM_BUILD_DIR/MovieBar-iOS/MovieBar.xcodeproj"
+      - name: Signierte iPhone-App bauen
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/MovieBar-iOS/MovieBar.xcodeproj" \
+            --scheme MovieBar \
+            --archive-xcargs "CURRENT_PROJECT_VERSION=${PROJECT_BUILD_NUMBER:?}"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_app_store: false
