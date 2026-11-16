@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Movie Bingo – 90 Zahlen</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#fff;background:#10241b}body{max-width:760px;margin:auto;padding:20px}header{text-align:center}h1{color:#e9c56c}.panel{background:#1d382a;padding:18px;border-radius:16px;margin:14px 0}.card{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}.cell{aspect-ratio:1;display:grid;place-items:center;border-radius:5px;background:#f6f0dd;color:#18271b;font-weight:800;font-size:clamp(12px,3vw,24px)}.blank{background:#45624e}.hit{background:#e9c56c;color:#10241b;outline:3px solid #fff}button{background:#e9c56c;border:0;border-radius:10px;padding:13px 18px;font-weight:800;margin:5px;cursor:pointer}button:disabled{opacity:.4}.drawn{display:flex;flex-wrap:wrap;gap:5px}.ball{background:#e9c56c;color:#10241b;border-radius:50%;width:32px;height:32px;display:grid;place-items:center;font-weight:700}.status{font-weight:800;color:#e9c56c}.small{opacity:.8;font-size:13px}</style></head>
+<body><header><h1>🎬 MOVIE BINGO</h1><p>90 Zahlen · 3 Reihen · 15 Gewinnzahlen</p></header>
+<div class="panel"><h2>Deine Bingokarte</h2><div id="card" class="card"></div><p id="status" class="status">Viel Glück!</p><button id="new">Neue Karte</button></div>
+<div class="panel"><h2>Zahlenziehung</h2><p>Zuletzt gezogen: <strong id="latest">–</strong></p><button id="draw">Zahl ziehen</button><button id="reset">Neues Spiel</button><p id="count">0 von 90 Zahlen gezogen</p><div id="drawn" class="drawn"></div></div>
+<p class="small">Kostenloses Übungsspiel ohne Geldgewinne. Die Ziehung erfolgt lokal auf deinem Gerät.</p>
+<script>
+const $=id=>document.getElementById(id);let card=[],drawn=[],rowWon=[false,false,false],fullWon=false;
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function generate(){
+  // Standard 90-ball ticket: 9 columns, 3 rows, 5 numbers per row, 1–3 per column.
+  // Each column uses its decade range and ascending numbers from top to bottom.
+  for(let attempt=0;attempt<10000;attempt++){
+    const c=Array.from({length:3},()=>Array(9).fill(null));
+    const rowCounts=[0,0,0],colCounts=Array(9).fill(0);
+    // Start each column with one position to ensure all nine columns are represented.
+    for(let col=0;col<9;col++){const rows=shuffle([0,1,2]);rows.sort((a,b)=>rowCounts[a]-rowCounts[b]);const row=rows[0];c[row][col]=0;rowCounts[row]++;colCounts[col]++}
+    let valid=true;
+    while(rowCounts.some(n=>n<5)){
+      const options=[];for(let r=0;r<3;r++)if(rowCounts[r]<5)for(let col=0;col<9;col++)if(c[r][col]===null&&colCounts[col]<3)options.push([r,col]);
+      if(!options.length){valid=false;break}
+      const [r,col]=options[Math.floor(Math.random()*options.length)];c[r][col]=0;rowCounts[r]++;colCounts[col]++;
+    }
+    if(!valid||rowCounts.some(n=>n!==5))continue;
+    for(let col=0;col<9;col++){
+      const lo=col===0?1:col*10,hi=col===8?90:col*10+9;
+      const nums=shuffle(Array.from({length:hi-lo+1},(_,i)=>lo+i)).slice(0,colCounts[col]).sort((a,b)=>a-b);
+      let k=0;for(let r=0;r<3;r++)if(c[r][col]!==null)c[r][col]=nums[k++];
+    }
+    return c;
+  }
+  throw Error('Karte konnte nicht erstellt werden');
+}
+function render(){
+ $('card').innerHTML='';
+ for(const row of card)for(const n of row){const el=document.createElement('div');el.className='cell'+(n===null?' blank':drawn.includes(n)?' hit':'');el.textContent=n===null?'':n;$('card').appendChild(el)}
+ $('latest').textContent=drawn.length?drawn[drawn.length-1]:'–';
+ $('count').textContent=drawn.length+' von 90 Zahlen gezogen';
+ $('drawn').innerHTML='';for(const n of drawn){const el=document.createElement('span');el.className='ball';el.textContent=n;$('drawn').appendChild(el)}
+ $('draw').disabled=drawn.length===90;
+}
+function check(){
+ const completed=card.map(row=>row.every(n=>n===null||drawn.includes(n)));
+ let msg='Viel Glück!';
+ for(let i=0;i<3;i++)if(completed[i]&&!rowWon[i]){rowWon[i]=true;msg='🎉 Reihe '+(i+1)+' vollständig!'}
+ if(completed.every(Boolean)&&!fullWon){fullWon=true;msg='🏆 MOVIE BINGO! Alle 15 Zahlen getroffen!'}
+ $('status').textContent=msg;
+}
+function fresh(){card=generate();drawn=[];rowWon=[false,false,false];fullWon=false;$('status').textContent='Viel Glück!';render()}
+$('draw').onclick=()=>{const left=Array.from({length:90},(_,i)=>i+1).filter(n=>!drawn.includes(n));if(!left.length)return;drawn.push(left[Math.floor(Math.random()*left.length)]);render();check()};
+$('new').onclick=fresh;$('reset').onclick=fresh;fresh();
+</script></body></html>
