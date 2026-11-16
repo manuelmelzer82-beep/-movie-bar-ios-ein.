@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131e">
+<title>Movie Bar – 10-Sekunden-Challenge</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif}*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;background:radial-gradient(circle at 50% 0,#293454,#10131e 70%);color:#fff;display:grid;place-items:center;padding:22px}
+main{width:min(100%,470px);text-align:center}header{font-size:13px;letter-spacing:.22em;font-weight:900;color:#f5cb68}
+h1{font-size:clamp(29px,8vw,43px);margin:12px 0 6px}.sub{color:#b6bfd1;line-height:1.5;margin-bottom:25px}
+.panel{border:1px solid #49516a;border-radius:24px;padding:25px 15px;background:#ffffff09;box-shadow:0 20px 50px #0005}
+.label{color:#aeb8cb;text-transform:uppercase;letter-spacing:.15em;font-size:12px}
+.timer{font-variant-numeric:tabular-nums;font-size:clamp(59px,17vw,90px);font-weight:800;letter-spacing:-.06em;margin:10px 0 17px}
+button{border:0;border-radius:14px;padding:17px 20px;font-size:19px;font-weight:800;cursor:pointer;width:100%;touch-action:manipulation}
+.primary{background:#f4c653;color:#171b29}.stop{background:#f26a65;color:#1b1113}
+button:disabled{opacity:.45;cursor:default}.result{min-height:70px;margin:22px 0 4px;line-height:1.6}
+strong{color:#f4c653}.stats{display:flex;gap:12px;margin-top:15px}.stat{flex:1;background:#ffffff0b;border:1px solid #ffffff19;padding:14px 5px;border-radius:13px}.stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.note{font-size:12px;color:#aab3c5;margin-top:22px;line-height:1.6}.again{background:transparent;color:#fff;border:1px solid #68728b;margin-top:12px;font-size:15px}
+</style>
+</head>
+<body>
+<main>
+<header>★ MOVIE BAR MECKENBEUREN ★</header>
+<h1>10-Sekunden-Challenge</h1>
+<p class="sub">Triff den perfekten Moment.<br>Stoppe die Uhr bei exakt <strong>10,00 Sekunden!</strong></p>
+<section class="panel" aria-label="Stoppuhr">
+<div class="label">Deine Zeit</div>
+<div id="timer" class="timer" role="timer" aria-live="off">00:00.00</div>
+<button id="action" class="primary">STARTEN</button>
+<button id="reset" class="again" hidden>NOCH EIN VERSUCH</button>
+<div id="result" class="result" aria-live="polite">Bereit für die Challenge?</div>
+</section>
+<div class="stats">
+<div class="stat"><span class="label">Versuche</span><b id="tries">0</b></div>
+<div class="stat"><span class="label">Bestwert</span><b id="best">–</b></div>
+</div>
+<p class="note">Kostenloser Übungsmodus · Keine Echtgeld-Einsätze oder Gewinne.<br>Die echte Movie-Bar-Aktion läuft unabhängig von diesem Spiel.</p>
+</main>
+<script>
+(()=>{'use strict';
+const timer=document.getElementById('timer'),action=document.getElementById('action'),reset=document.getElementById('reset'),result=document.getElementById('result'),triesEl=document.getElementById('tries'),bestEl=document.getElementById('best');
+let state='ready',started=0,frame=0,tries=0,best=Infinity;
+function format(ms){const cent=Math.floor(Math.max(0,ms)/10);const sec=Math.floor(cent/100);return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')+'.'+String(cent%100).padStart(2,'0')}
+function render(){if(state!=='running')return;timer.textContent=format(performance.now()-started);frame=requestAnimationFrame(render)}
+action.addEventListener('click',()=>{
+ if(state==='ready'){
+  state='running';started=performance.now();action.textContent='STOPP!';action.className='stop';result.textContent='Jetzt im richtigen Moment stoppen!';frame=requestAnimationFrame(render);
+ }else if(state==='running'){
+  const elapsed=performance.now()-started;state='done';cancelAnimationFrame(frame);timer.textContent=format(elapsed);
+  const difference=Math.abs(elapsed-10000);tries++;best=Math.min(best,difference);
+  triesEl.textContent=String(tries);bestEl.textContent=(best/1000).toFixed(2)+' s';
+  const perfect=Math.floor(elapsed/10)===1000;
+  result.innerHTML=perfect?'<strong>Volltreffer! 10,00 Sekunden!</strong>': 'Abweichung: <strong>'+(difference/1000).toFixed(2)+' Sekunden</strong><br>'+(elapsed<10000?'Zu früh gestoppt!':'Zu spät gestoppt!');
+  action.hidden=true;reset.hidden=false;
+ }
+});
+reset.addEventListener('click',()=>{state='ready';timer.textContent='00:00.00';result.textContent='Bereit für die nächste Runde?';action.hidden=false;action.className='primary';action.textContent='STARTEN';reset.hidden=true});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='running'){cancelAnimationFrame(frame);state='ready';timer.textContent='00:00.00';action.textContent='STARTEN';action.className='primary';result.textContent='Versuch unterbrochen – bitte erneut starten.'}});
+})();
+</script>
+</body>
+</html>
