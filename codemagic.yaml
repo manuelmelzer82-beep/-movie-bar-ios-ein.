@@ -6,8 +6,52 @@ workflows:
     environment:
       xcode: latest
     scripts:
-      - name: Xcode-Projekt entpacken
-        script: unzip -q MovieBar-iOS.zip
+      - name: Xcode-Projekt entpacken und Build 6 einbauen
+        script: |
+          unzip -q MovieBar-iOS.zip
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("MovieBar-iOS/MovieBar/MovieBarApp.swift")
+          s = p.read_text()
+          assert 'MovieMenu(selection: $tab)' in s, 'Unexpected source version'
+          s = s.replace('import SwiftUI', 'import SwiftUI\nimport WebKit', 1)
+          s = s.replace('@State private var tab = MovieTab.today', '@State private var tab = MovieTab.today\n    @State private var webSection = "steckbrief"', 1)
+          s = s.replace('MovieMenu(selection: $tab)', 'MovieMenu(selection: $tab, webSection: $webSection)', 1)
+          s = s.replace('case today, calendar, jackpots', 'case today, calendar, jackpots, website', 1)
+          s = s.replace('@Binding var selection: MovieTab', '@Binding var selection: MovieTab\n    @Binding var webSection: String', 1)
+          old = 'Link(destination: movieWebsite.appending(fragment: entry.id)) {\n                                    menuLabel(entry.title)'
+          new = 'Button {\n                                    webSection = entry.id\n                                    selection = .website\n                                } label: {\n                                    menuLabel(entry.title, selected: selection == .website && webSection == entry.id)'
+          assert old in s
+          s = s.replace(old, new, 1)
+          marker = 'JackpotsView()\n                        .tag(MovieTab.jackpots)\n                        .tabItem { Label("Jackpots", systemImage: "trophy") }'
+          assert marker in s
+          s = s.replace(marker, marker + '\n\n                    MovieWebsiteView(fragment: webSection)\n                        .tag(MovieTab.website)\n                        .tabItem { Label("Homepage", systemImage: "globe") }', 1)
+          old = 'guard let entry = entries.first(where: { $0.tab == tab }) else { return }\n            scroll(to: entry.id)'
+          assert old in s
+          s = s.replace(old, 'if tab == .website { scroll(to: webSection) }\n            else if let entry = entries.first(where: { $0.tab == tab }) { scroll(to: entry.id) }', 1)
+          s += """
+          
+          private struct MovieWebsiteView: View {
+              let fragment: String
+              var body: some View {
+                  MovieWebsiteWebView(url: movieWebsite.appending(fragment: fragment))
+                      .id(fragment)
+              }
+          }
+          private struct MovieWebsiteWebView: UIViewRepresentable {
+              let url: URL
+              func makeUIView(context: Context) -> WKWebView {
+                  let view = WKWebView()
+                  view.allowsBackForwardNavigationGestures = true
+                  return view
+              }
+              func updateUIView(_ webView: WKWebView, context: Context) {
+                  if webView.url != url { webView.load(URLRequest(url: url)) }
+              }
+          }
+          """
+          p.write_text(s)
+          PY
       - name: Für den iPhone-Simulator kompilieren
         script: |
           xcodebuild \
@@ -30,8 +74,52 @@ workflows:
         distribution_type: app_store
         bundle_identifier: de.moviebarmeckenbeuren.app
     scripts:
-      - name: Xcode-Projekt entpacken
-        script: unzip -q MovieBar-iOS.zip
+      - name: Xcode-Projekt entpacken und Build 6 einbauen
+        script: |
+          unzip -q MovieBar-iOS.zip
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("MovieBar-iOS/MovieBar/MovieBarApp.swift")
+          s = p.read_text()
+          assert 'MovieMenu(selection: $tab)' in s, 'Unexpected source version'
+          s = s.replace('import SwiftUI', 'import SwiftUI\nimport WebKit', 1)
+          s = s.replace('@State private var tab = MovieTab.today', '@State private var tab = MovieTab.today\n    @State private var webSection = "steckbrief"', 1)
+          s = s.replace('MovieMenu(selection: $tab)', 'MovieMenu(selection: $tab, webSection: $webSection)', 1)
+          s = s.replace('case today, calendar, jackpots', 'case today, calendar, jackpots, website', 1)
+          s = s.replace('@Binding var selection: MovieTab', '@Binding var selection: MovieTab\n    @Binding var webSection: String', 1)
+          old = 'Link(destination: movieWebsite.appending(fragment: entry.id)) {\n                                    menuLabel(entry.title)'
+          new = 'Button {\n                                    webSection = entry.id\n                                    selection = .website\n                                } label: {\n                                    menuLabel(entry.title, selected: selection == .website && webSection == entry.id)'
+          assert old in s
+          s = s.replace(old, new, 1)
+          marker = 'JackpotsView()\n                        .tag(MovieTab.jackpots)\n                        .tabItem { Label("Jackpots", systemImage: "trophy") }'
+          assert marker in s
+          s = s.replace(marker, marker + '\n\n                    MovieWebsiteView(fragment: webSection)\n                        .tag(MovieTab.website)\n                        .tabItem { Label("Homepage", systemImage: "globe") }', 1)
+          old = 'guard let entry = entries.first(where: { $0.tab == tab }) else { return }\n            scroll(to: entry.id)'
+          assert old in s
+          s = s.replace(old, 'if tab == .website { scroll(to: webSection) }\n            else if let entry = entries.first(where: { $0.tab == tab }) { scroll(to: entry.id) }', 1)
+          s += """
+          
+          private struct MovieWebsiteView: View {
+              let fragment: String
+              var body: some View {
+                  MovieWebsiteWebView(url: movieWebsite.appending(fragment: fragment))
+                      .id(fragment)
+              }
+          }
+          private struct MovieWebsiteWebView: UIViewRepresentable {
+              let url: URL
+              func makeUIView(context: Context) -> WKWebView {
+                  let view = WKWebView()
+                  view.allowsBackForwardNavigationGestures = true
+                  return view
+              }
+              func updateUIView(_ webView: WKWebView, context: Context) {
+                  if webView.url != url { webView.load(URLRequest(url: url)) }
+              }
+          }
+          """
+          p.write_text(s)
+          PY
       - name: Signierung einrichten
         script: |
           xcode-project use-profiles \
@@ -41,7 +129,7 @@ workflows:
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/MovieBar-iOS/MovieBar.xcodeproj" \
             --scheme MovieBar \
-            --archive-xcargs "CURRENT_PROJECT_VERSION=${PROJECT_BUILD_NUMBER:?}"
+            --archive-xcargs "CURRENT_PROJECT_VERSION=6"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
